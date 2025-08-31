@@ -1,0 +1,424 @@
+Cmakelists配置
+cmake_minimum_required(VERSION 3.16)
+
+project(jzzhq VERSION 0.1 LANGUAGES CXX)
+
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
+
+set(PROJECT_SOURCES
+        main.cpp
+        jzzhq.cpp
+        mainwindow.cpp
+        mainwindow.h
+        mainwindow.ui
+)
+
+if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
+    qt_add_executable(jzzhq
+        MANUAL_FINALIZATION
+        ${PROJECT_SOURCES}
+    )
+# Define target properties for Android with Qt 6 as:
+#    set_property(TARGET jzzhq APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
+#                 ${CMAKE_CURRENT_SOURCE_DIR}/android)
+# For more information, see https://doc.qt.io/qt-6/qt-add-executable.html#target-creation
+else()
+    if(ANDROID)
+        add_library(jzzhq SHARED
+            ${PROJECT_SOURCES}
+        )
+# Define properties for Android with Qt 5 after find_package() calls as:
+#    set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android")
+    else()
+        add_executable(jzzhq
+            ${PROJECT_SOURCES}
+        )
+    endif()
+endif()
+
+target_link_libraries(jzzhq PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
+
+# Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
+# If you are developing for iOS or macOS you should consider setting an
+# explicit, fixed bundle identifier manually though.
+if(${QT_VERSION} VERSION_LESS 6.1.0)
+  set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.jzzhq)
+endif()
+set_target_properties(jzzhq PROPERTIES
+    ${BUNDLE_ID_OPTION}
+    MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
+    MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+    MACOSX_BUNDLE TRUE
+    WIN32_EXECUTABLE TRUE
+)
+
+include(GNUInstallDirs)
+install(TARGETS jzzhq
+    BUNDLE DESTINATION .
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+if(QT_VERSION_MAJOR EQUAL 6)
+    qt_finalize_executable(jzzhq)
+endif()
+
+进制转换器核心算法(jzzhq.cpp)
+#include<string> 
+#include"jzzhq.h"
+using namespace std;
+
+
+void Jzzhq::splitNum(string num, string& integer, string& decimal)
+{
+
+	//获取数字字符串长度
+	int len = (int)num.length();
+	//索引
+	int i = 0;
+	//寻找小数点位置
+	for (; i < len; i++)
+	{
+		if (num[i] == '.')
+		{
+			break;
+		}
+	}
+	//截取整数部分和小数部分
+	integer = num.substr(0, i);
+	//当有小数部分时
+	if (i != len)
+	{
+		decimal = num.substr(i + 1, len - i - 1);
+	}
+}
+
+int Jzzhq::stn(char strnum) {
+	//字符0到9
+	if (strnum >= 48 && strnum <= 57)
+	{
+		return (int)strnum - 48;
+	}
+	//字符A到Z
+	else if (strnum >= 65 && strnum <= 90) {
+		return (int)strnum - 55;
+	}
+	//字符a到z
+	else if (strnum >= 97 && strnum <= 122)
+	{
+		return (int)strnum - 87;
+	}
+	else
+	{
+		return -1;
+	}
+}
+
+char Jzzhq::nts(int num) {
+	if (num >= 0 && num <= 9)
+	{
+		return to_string(num)[0];
+	}
+	else if (num >= 10 && num <= 36) {
+		return num + 55;
+	}
+	else {
+		return '*';
+	}
+}
+
+bool Jzzhq::check(int m, string num) {
+	//进制超限
+	if (m < 2 || m>36)
+	{
+		return false;
+	}
+	//检查字母
+	for (int i = 0; i < (int)num.length(); i++)
+	{
+		//检查数字部分
+		if (num[i] <= 57 && num[i] >= 48)
+		{
+			//数字部分大于进制
+			if (num[i] - 48 > m-1)
+			{
+				return false;
+			}
+		}
+		//大写字母部分
+		else if (num[i] <= 90 && num[i] >= 65) {
+			if (num[i] - 65 > m - 11) {
+				return false;
+			}
+		}
+		//小写字母部分
+		else if (num[i] <= 122 && num[i] >= 97) {
+			if (num[i] - 97 > m - 11) {
+				return false;
+			}
+		}
+		//不合规的字符
+		else {
+			return false;
+		}
+	}
+	//通过检查
+	return true;
+
+}
+
+string Jzzhq::change(int m, int n, int jd, string num) {
+
+
+	bool fs = false;
+	//检查是否为负数
+	if (num[0] == '-')
+	{
+		fs = true;
+		//截取整数部分
+		num = num.substr(1, num.length() - 1);
+	}
+
+
+	//中间十进制数整数部分
+	long long num10 = 0;
+	//中间十进制数小数部分
+	double dnum10 = 0;
+	//整数部分和小数部分
+	string integer = "0", decimal = "0";
+	//进行拆分
+	splitNum(num, integer, decimal);
+
+	//分别进行合法性检验
+		//未通过检验
+	if (!check(m, integer) || !check(m, decimal))
+	{
+		return (string)"error";
+	}
+
+	//原进制转向十进制
+	//整数部分转十进制
+	for (int i = 0; i < (int)integer.length(); i++)
+	{
+		//该位上的数乘以权重
+		num10 += (long long)(stn(integer[i]) * pow(m, integer.length() - 1 - i));
+	}
+	//当有小数时
+	if (decimal != "0")
+	{
+		for (int i = 0; i < (int)decimal.length(); i++)
+		{
+			dnum10 += (double)(stn(decimal[i]) * pow(m, -(i + 1)));
+		}
+	}
+	//十进制转向目标进制
+	//目标进制的整数部分,目标进制的小数部分
+	string tari = "", tard = "", tempTari = "";
+	//整数部分
+	//商与余
+	long long int quotient = num10, remainder = 0;
+	//当商不为零时
+	while (quotient)
+	{
+		//取得商除以目标进制的余数
+		remainder = quotient % n;
+		//更新商
+		quotient /= n;
+		//将得到的余数拼接到结果的临时整数部分上去
+		tempTari += nts(remainder);
+	}
+	//前后交换！(此处由于前面拼接是从最后一位开始拼接的，所以最后需要倒过来)
+	for (int i = (int)tempTari.length() - 1; i >= 0; i--)
+	{
+		// 修改整数部分处理逻辑
+		string tari = tempTari.empty() ? "0" : string(tempTari.rbegin(), tempTari.rend());
+	}
+	//有小数部分时
+	if (dnum10 != 0) {
+		//小数部分乘以目标进制得到的整数部分
+		int tempTard = 0;
+		//依照精度进行循环
+		for (int i = 0; i < jd; i++)
+		{
+			//得到乘以进制后的整数部分
+			tempTard = (int)(dnum10 * n);
+			tard += nts(tempTard);
+			//更新小数
+			dnum10 = dnum10 * n - tempTard;
+		}
+	}
+
+	//判断是否要加上负号
+	if (fs) {
+		return "-" + (tari == "" ? "0" : tari + (tard == "" ? "" : ("." + tard)));
+	}
+	else
+	{
+		return tari == "" ? "0" : tari + (tard == "" ? "" : ("." + tard));
+	}
+
+
+}
+进制转换器（jzzhq.h）
+#ifndef E46FCEB5_2520_4A00_B760_65DF2C6F80DB
+#define E46FCEB5_2520_4A00_B760_65DF2C6F80DB
+#include<string>
+using namespace std;
+class Jzzhq {
+public:
+	//对外接口
+	//进制转换
+	//原进制，目标进制，精度，待转化数字
+	//转换失败发送error
+	string change(int, int, int, string);
+
+
+private:
+
+	//拆分字符串数字，将其拆为整数部分和小数部分
+	//原字符串数字，整数部分，小数部分
+	void splitNum(string, string&, string&);
+
+	//将字符数字转换为数字
+	int stn(char);
+
+	//数字转换字符
+	char nts(int);
+
+	//输入校验
+	//进制，待检验的字符串
+	bool check(int, string);
+
+
+};
+
+
+
+
+
+
+
+
+
+
+
+#endif /* E46FCEB5_2520_4A00_B760_65DF2C6F80DB */
+这是main.cpp
+#include "mainwindow.h"
+#include <QApplication>
+
+int main(int argc, char *argv[])
+{
+    QApplication app(argc, argv);
+    app.setApplicationName("进制转换器");
+    MainWindow w;
+    w.show();
+    return app.exec();
+}
+这是mainwindow.cpp
+#include "mainwindow.h"
+#include "ui_mainwindow.h"
+#include "jzzhq.h"
+#include <QString>
+#include <QMessageBox>
+
+// 主窗口构造函数
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent), ui(new Ui::MainWindow), converter(new Jzzhq) // 初始化UI组件和转换器对象
+{
+    ui->setupUi(this);
+    setWindowTitle(""); // 设置空窗口标题
+
+    // 连接按钮点击信号与槽函数
+    connect(ui->convertButton, &QPushButton::clicked, this, &MainWindow::onConvertClicked);
+    connect(ui->swapButton, &QPushButton::clicked, this, &MainWindow::onSwapBasesClicked);
+}
+
+MainWindow::~MainWindow()
+{
+    delete converter;
+    delete ui;
+}
+
+// 数值转换按钮点击事件处理
+void MainWindow::onConvertClicked()
+{
+    // 获取用户输入
+    QString num = ui->inputNumber->text();         // 待转换数字
+    QString fromBaseStr = ui->fromBase->text();    // 原始进制
+    QString toBaseStr = ui->toBase->text();        // 目标进制
+
+    // 进制参数有效性检查
+    bool ok1, ok2;
+    int fromBase = fromBaseStr.toInt(&ok1);
+    int toBase = toBaseStr.toInt(&ok2);
+
+    // 检查进制范围（2-36）
+    if (!ok1 || !ok2 || fromBase < 2 || fromBase > 36 || toBase < 2 || toBase > 36) {
+        ui->result->setText("Invalid base range (2-36).");
+        return;
+    }
+
+    // 调用转换器执行实际转换
+    std::string result = converter->change(fromBase, toBase, 5, num.toStdString());
+
+    // 处理转换结果
+    if (result == "error") {
+        // 错误状态显示（红色文字）
+        ui->result->setStyleSheet("color: red;");
+        ui->result->setText(QString("'%1' is not a valid base-%2 number.").arg(num).arg(fromBase));
+    } else {
+        // 成功转换显示（绿色文字）
+        ui->result->setStyleSheet("color: green;");
+        ui->result->setText(QString::fromStdString(result));
+    }
+}
+
+// 交换进制按钮点击事件处理
+void MainWindow::onSwapBasesClicked()
+{
+    // 交换原始进制和目标进制的值
+    QString tmp = ui->fromBase->text();
+    ui->fromBase->setText(ui->toBase->text());
+    ui->toBase->setText(tmp);
+}
+这是mainwindow.h
+// mainwindow.h
+#pragma once
+
+#include <QMainWindow>
+
+QT_BEGIN_NAMESPACE
+namespace Ui { class MainWindow; }
+QT_END_NAMESPACE
+
+class Jzzhq;
+
+class MainWindow : public QMainWindow
+{
+    Q_OBJECT
+
+public:
+    MainWindow(QWidget *parent = nullptr);
+    ~MainWindow();
+
+private slots:
+    void onConvertClicked();
+    void onSwapBasesClicked();
+
+private:
+    Ui::MainWindow *ui;
+    Jzzhq* converter;
+};
+
+
+
+
